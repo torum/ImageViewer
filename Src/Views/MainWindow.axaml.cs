@@ -904,17 +904,31 @@ internal sealed partial class MainWindow : Window
                     this.Cursor = Cursor.Default;
                 }
 
-                var flyout = FlyoutBase.GetAttachedFlyout(target);
-                if (flyout is MenuFlyout menuFlyout)
+                var visualPoint = e.GetPosition(target);
+
+                if (visualPoint.Y < 36)
                 {
-                    menuFlyout.Placement = PlacementMode.Pointer;
+                    if (GetTopLevel(this)?.TryGetPlatformHandle() is not { } handle) return;
+                    
+                    var screenPoint = this.PointToScreen(visualPoint);
+
+                    NativeMethods.ShowNativeSystemMenu(handle.Handle, screenPoint, target.WindowState, true);
+                }
+                else
+                {
+                    var flyout = FlyoutBase.GetAttachedFlyout(target);
+                    if (flyout is MenuFlyout menuFlyout)
+                    {
+                        menuFlyout.Placement = PlacementMode.Pointer;
+                    }
+
+                    // Show the flyout using the 'Placement="Pointer"' property.
+                    flyout?.ShowAt(target);
+
+                    this.Activate();
+                    this.Focus();
                 }
 
-                // Show the flyout using the 'Placement="Pointer"' property.
-                flyout?.ShowAt(target);
-
-                this.Activate();
-                this.Focus();
             }
         }
     }
@@ -2545,57 +2559,52 @@ public static partial class NativeMethods
         }
     }
 
-    public static void ShowNativeSystemMenu(PointerPressedEventArgs e, IntPtr hWnd, PixelPoint screenPoint, WindowState windowState, bool canResize)
+    public static void ShowNativeSystemMenu(IntPtr hWnd, PixelPoint screenPoint, WindowState windowState, bool canResize)
     {
         // Fetch the window's live System Menu handle
         IntPtr sysMenu = GetSystemMenu(hWnd, false);
-        if (sysMenu != IntPtr.Zero)
+        if (sysMenu == IntPtr.Zero)
         {
-            // FORCE WINDOWS TO RE-EVALUATE/ENABLE SYSTEM MENU ITEMS
-            // wParam is the menu handle; lParam contains flags (IntPtr.Zero is standard)
-            // 0x00010000 tells Windows: "This is the System Menu, update states relative to the window"
-            //IntPtr lParam = new IntPtr(0x00010000);
-            //SendMessage(hWnd, WM_INITMENUPOPUP, sysMenu, lParam);
-
-            // Explicitly force the Close menu option to become enabled
-
-            // Close is always active
-            EnableMenuItem(sysMenu, SC_CLOSE, MF_BYCOMMAND | MF_ENABLED);
-
-            // Adjust actions based on WindowState
-            if (windowState == WindowState.Maximized)
-            {
-                EnableMenuItem(sysMenu, SC_RESTORE, MF_BYCOMMAND | MF_ENABLED);
-                EnableMenuItem(sysMenu, SC_MAXIMIZE, MF_BYCOMMAND | MF_GRAYED);
-                EnableMenuItem(sysMenu, SC_MOVE, MF_BYCOMMAND | MF_GRAYED);
-                EnableMenuItem(sysMenu, SC_SIZE, MF_BYCOMMAND | MF_GRAYED);
-            }
-            else if (windowState == WindowState.Minimized)
-            {
-                EnableMenuItem(sysMenu, SC_RESTORE, MF_BYCOMMAND | MF_ENABLED);
-                EnableMenuItem(sysMenu, SC_MINIMIZE, MF_BYCOMMAND | MF_GRAYED);
-            }
-            else // Normal / Restored
-            {
-                EnableMenuItem(sysMenu, SC_RESTORE, MF_BYCOMMAND | MF_GRAYED);
-                EnableMenuItem(sysMenu, SC_MAXIMIZE, canResize ? (MF_BYCOMMAND | MF_ENABLED) : (MF_BYCOMMAND | MF_GRAYED));
-                EnableMenuItem(sysMenu, SC_MINIMIZE, MF_BYCOMMAND | MF_ENABLED);
-                EnableMenuItem(sysMenu, SC_MOVE, MF_BYCOMMAND | MF_ENABLED);
-                EnableMenuItem(sysMenu, SC_SIZE, canResize ? (MF_BYCOMMAND | MF_ENABLED) : (MF_BYCOMMAND | MF_GRAYED));
-            }
-
-            // Display the native menu at the cursor context.
-            // TPM_RETURNCMD forces TrackPopupMenu to return the ID of the clicked menu item.
-            int command = TrackPopupMenu(sysMenu, TPM_RETURNCMD, screenPoint.X, screenPoint.Y, 0, hWnd, IntPtr.Zero);
-
-            if (command > 0)
-            {
-                // Post the selected command back to the window loop so Windows handles it (Minimize, Maximize, Close, Move, etc.)
-                PostMessage(hWnd, WM_SYSCOMMAND, (IntPtr)command, IntPtr.Zero);
-            }
-
-            e.Handled = true;
+            return;
         }
+
+        // Explicitly force the Close menu option to become enabled
+        // Close is always active
+        EnableMenuItem(sysMenu, SC_CLOSE, MF_BYCOMMAND | MF_ENABLED);
+
+        // Adjust actions based on WindowState
+        if (windowState == WindowState.Maximized)
+        {
+            EnableMenuItem(sysMenu, SC_RESTORE, MF_BYCOMMAND | MF_ENABLED);
+            EnableMenuItem(sysMenu, SC_MAXIMIZE, MF_BYCOMMAND | MF_GRAYED);
+            EnableMenuItem(sysMenu, SC_MOVE, MF_BYCOMMAND | MF_GRAYED);
+            EnableMenuItem(sysMenu, SC_SIZE, MF_BYCOMMAND | MF_GRAYED);
+        }
+        else if (windowState == WindowState.Minimized)
+        {
+            EnableMenuItem(sysMenu, SC_RESTORE, MF_BYCOMMAND | MF_ENABLED);
+            EnableMenuItem(sysMenu, SC_MINIMIZE, MF_BYCOMMAND | MF_GRAYED);
+        }
+        else // Normal / Restored
+        {
+            EnableMenuItem(sysMenu, SC_RESTORE, MF_BYCOMMAND | MF_GRAYED);
+            EnableMenuItem(sysMenu, SC_MAXIMIZE, canResize ? (MF_BYCOMMAND | MF_ENABLED) : (MF_BYCOMMAND | MF_GRAYED));
+            EnableMenuItem(sysMenu, SC_MINIMIZE, MF_BYCOMMAND | MF_ENABLED);
+            EnableMenuItem(sysMenu, SC_MOVE, MF_BYCOMMAND | MF_ENABLED);
+            EnableMenuItem(sysMenu, SC_SIZE, canResize ? (MF_BYCOMMAND | MF_ENABLED) : (MF_BYCOMMAND | MF_GRAYED));
+        }
+
+        // Display the native menu at the cursor context.
+        // TPM_RETURNCMD forces TrackPopupMenu to return the ID of the clicked menu item.
+        int command = TrackPopupMenu(sysMenu, TPM_RETURNCMD, screenPoint.X, screenPoint.Y, 0, hWnd, IntPtr.Zero);
+
+        if (command > 0)
+        {
+            // Post the selected command back to the window loop so Windows handles it (Minimize, Maximize, Close, Move, etc.)
+            PostMessage(hWnd, WM_SYSCOMMAND, (IntPtr)command, IntPtr.Zero);
+        }
+
+        //e.Handled = true;
     }
 
     #endregion
