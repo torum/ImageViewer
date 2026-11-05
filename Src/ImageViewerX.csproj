@@ -10,8 +10,8 @@
 		<AssemblyName>ImageViewerX</AssemblyName>
 		<ApplicationIcon>Assets\ImageViewerX-AppIcon.ico</ApplicationIcon>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-		<VersionPrefix>1.0.4.0</VersionPrefix>
-		<FileVersion>1.0.4.0</FileVersion>
+		<VersionPrefix>1.0.5.0</VersionPrefix>
+		<FileVersion>1.0.5.0</FileVersion>
 		<IsAotCompatible>true</IsAotCompatible>
 	</PropertyGroup>
 
