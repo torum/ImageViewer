@@ -1156,7 +1156,7 @@ internal sealed partial class MainWindow : Window
                     // Single file dropped, in that case, get all siblings.
                     if (fileNames.Count == 1)
                     {
-                        if (System.IO.File.Exists(fileNames[0]))
+                        if (System.IO.File.Exists(fileNames[0]) && MainViewModel.HasImageExtension(fileNames[0], MainViewModel.ValidExtensions))
                         {
                             singleSelectedOriginalFile = fileNames[0];
 
@@ -1295,7 +1295,7 @@ internal sealed partial class MainWindow : Window
                     // Single file dropped, in that case, get all siblings.
                     if (droppedFiles.Count == 1)
                     {
-                        if (System.IO.File.Exists(droppedFiles[0]))
+                        if (System.IO.File.Exists(droppedFiles[0]) && MainViewModel.HasImageExtension(droppedFiles[0], MainViewModel.ValidExtensions))
                         {
                             //var originalFile = droppedFiles[0];
                             singleSelectedOriginalFile = droppedFiles[0];
@@ -1361,11 +1361,6 @@ internal sealed partial class MainWindow : Window
                 if (_cts == null || _cts.IsCancellationRequested)
                 {
                     return;
-                }
-
-                if (!MainViewModel.HasImageExtension(singleSelectedOriginalFile, MainViewModel.ValidExtensions))
-                {
-                    singleSelectedOriginalFile = string.Empty;
                 }
 
                 if (droppedImages.Count < 1)
