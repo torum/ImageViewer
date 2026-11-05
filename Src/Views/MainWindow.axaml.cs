@@ -1363,6 +1363,11 @@ internal sealed partial class MainWindow : Window
                     return;
                 }
 
+                if (!MainViewModel.HasImageExtension(singleSelectedOriginalFile, MainViewModel.ValidExtensions))
+                {
+                    singleSelectedOriginalFile = string.Empty;
+                }
+
                 if (droppedImages.Count < 1)
                 {
                     Dispatcher.UIThread.Post(() =>

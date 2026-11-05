@@ -1314,6 +1314,17 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
 
         bitmap?.Dispose();
     }
+    private static bool PathsEqual(string left, string right)
+    {
+        var comparison = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        return string.Equals(
+            Path.GetFullPath(left),
+            Path.GetFullPath(right),
+            comparison);
+    }
 
     #endregion
 
@@ -1389,6 +1400,14 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             }
         }
 
+        ImageInfo? selectedItem = null;
+        if (!string.IsNullOrWhiteSpace(singleSelectedOriginalFile))
+        {
+            selectedItem = Queue.FirstOrDefault(x =>
+                !string.IsNullOrWhiteSpace(x.ImageFilePath) &&
+                PathsEqual(x.ImageFilePath, singleSelectedOriginalFile));
+        }
+
         if (_isShuffleOn)
         {
             //Debug.WriteLine("Shuffle @DroppedFiles()");
@@ -1396,21 +1415,29 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             Queue.Shuffle();
 
             // Move the single selected image file to top/ 0 index if exist for easier viewing when shuffled. This is for the case when user select a file and drag and drop to the app.
-            if (!string.IsNullOrEmpty(singleSelectedOriginalFile))
+            //if (!string.IsNullOrEmpty(singleSelectedOriginalFile))
+            if (selectedItem is not null)
             {
+                /*
                 var item = Queue.First(x => x.ImageFilePath == singleSelectedOriginalFile);
                 Queue.Remove(item);
                 Queue.Insert(0, item);
+                _queueIndex = 0;
+                */
+                Queue.Remove(selectedItem);
+                Queue.Insert(0, selectedItem);
                 _queueIndex = 0;
             }
         }
         else
         {
             // Move index to the single selected file if exist. This is for the case when user select a file and drag and drop to the app.
-            if (!string.IsNullOrEmpty(singleSelectedOriginalFile))
+            //if (!string.IsNullOrEmpty(singleSelectedOriginalFile))
+            if (selectedItem is not null)
             {
-                var item = Queue.First(x => x.ImageFilePath == singleSelectedOriginalFile);
-                _queueIndex = Queue.IndexOf(item);
+                //var item = Queue.First(x => x.ImageFilePath == singleSelectedOriginalFile);
+                //_queueIndex = Queue.IndexOf(item);
+                _queueIndex = Queue.IndexOf(selectedItem);
             }
         }
 
