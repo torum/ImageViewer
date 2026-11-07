@@ -164,7 +164,10 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
             }
 
             // Don't await here. Fire and forget. No _ = either.
-            _ = Task.Run(() => GetPicturesAsync(field), _cts?.Token ?? CancellationToken.None);
+            //_ = Task.Run(() => GetPicturesAsync(field), _cts?.Token ?? CancellationToken.None);
+            _ = GetPicturesAsync(field);
+
+            //Debug.WriteLine($"@VisibleItemsImageInfo: {i} items, IsWorking: {IsWorking}, Queue.Count: {Queue.Count}");
         }
     }
 
@@ -807,13 +810,12 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
 
             //Debug.WriteLine($"@GetPictures IsLoading: {img.ImageFilePath}");
 
-            // TODO: This try is not ...
-            try
+            // Don't await. Fire and Forget.
+            //await Dispatcher.UIThread.InvokeAsync(async () =>
+            Dispatcher.UIThread.Post(async () =>
             {
-                // Don't await. Fire and Forget.
-                //Dispatcher.UIThread.Post(async () =>
-                await Dispatcher.UIThread.InvokeAsync(async () =>
-                {   
+                try
+                {
                     var bitmap = await Task.Run(() =>
                     {
                         if (_cts is null)
@@ -832,19 +834,6 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
                         {
                             //return new Bitmap(img.ImageFilePath);
                             return UniversalBitmapLoader.LoadAnyImage(img.ImageFilePath, _displayDpi, _hardwareDisplayWidth, _hardwareDisplayHeight);
-                            /*
-                            string extension = Path.GetExtension(img.ImageFilePath).ToLowerInvariant();
-                            // AVIF
-                            if (extension == ".avif")
-                            {
-                                using var fileStream = new FileStream(img.ImageFilePath, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, useAsync: true);
-                                return AvifImageDecoder.DecodeAvifToAvalonia(fileStream, _displayDpi);
-                            }
-                            else
-                            {
-                                return new Bitmap(img.ImageFilePath);
-                            }
-                            */
                         }
                         catch (Exception ex)
                         {
@@ -858,60 +847,60 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
                     }, _cts?.Token ?? CancellationToken.None);
                     //Bitmap? bitmap = new(img.ImageFilePath);
 
-                    if (bitmap is null)
+                    if (_cts is not null && _cts.IsCancellationRequested)
                     {
-                        // TODO
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            img.IsAcquired = false;
-                            img.IsLoading = false;
-                            img.ImageSource = null;
-                        });
                         return;
                     }
 
-                    img.ImageSource = bitmap;
+                    if (bitmap is null)
+                    {
+                        img.IsAcquired = false;
+                        img.IsLoading = false;
+                        img.ImageSource = null;
+                        return;
+                    }
 
                     //img.ImageSource = img.ImageSource.CreateScaledBitmap(new PixelSize((int)(img.ImageSource.PixelSize.Width / 1.5), (int)(img.ImageSource.PixelSize.Height / 1.5)));
                     if (IsOverrideSystemDpiScalingFactorOn && (SystemDpiScalingFactor > 1))
                     {
-                        img.ImageWidth = (img.ImageSource.PixelSize.Width / SystemDpiScalingFactor);
-                        img.ImageHeight = (img.ImageSource.PixelSize.Height / SystemDpiScalingFactor);
+                        img.ImageWidth = (bitmap.PixelSize.Width / SystemDpiScalingFactor);
+                        img.ImageHeight = (bitmap.PixelSize.Height / SystemDpiScalingFactor);
                     }
                     else
                     {
-                        img.ImageWidth = (img.ImageSource.PixelSize.Width);
-                        img.ImageHeight = (img.ImageSource.PixelSize.Height);
+                        img.ImageWidth = (bitmap.PixelSize.Width);
+                        img.ImageHeight = (bitmap.PixelSize.Height);
                     }
+
+                    img.ImageSource = bitmap;
 
                     AdjustStretchProperty(img);
 
                     img.IsAcquired = true;
                     img.IsLoading = false;
-                }, DispatcherPriority.Default);//Default//.Background //Loaded
-
-            }
-            catch (Exception e)
-            {
-                // TODO:
-                await Dispatcher.UIThread.InvokeAsync(() =>
+                }
+                catch (Exception e)
                 {
                     img.IsAcquired = false;
                     img.IsLoading = false;
                     img.ImageSource = null;
-                });
 
-                Debug.WriteLine("GetPictures: Exception while loading: " + img.ImageFilePath + Environment.NewLine + e.Message);
+                    Debug.WriteLine("GetPictures: Exception while loading: " + img.ImageFilePath + Environment.NewLine + e.Message);
 
-                continue;
-            }
-            finally
-            {
-                img.IsLoading = false;
-            }
+                    //continue;
+                }
+                finally
+                {
+                    img.IsLoading = false;
+                }
 
-            await Task.Delay(50);
-            await Task.Yield();
+                // meaningless to wait here.
+                //await Task.Delay(200);
+                await Task.Yield();
+
+            }, DispatcherPriority.Background);//Default//.Background //Loaded
+
+            await Task.Delay(200);
         }
     }
 
