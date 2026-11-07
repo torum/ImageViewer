@@ -35,9 +35,11 @@ public static class UniversalBitmapLoader
                 // First, instantiate a standard Bitmap context. 
                 // This reads only metadata info or maps the layout array without fully uncompressing.
                 var nativeMetaInfo = new Bitmap(stream);
+                var sourcePixelSize = nativeMetaInfo.PixelSize;
 
                 // Check if the image width is physically larger than your active screen resolution
-                if (nativeMetaInfo.Size.Width > hardwareDisplayWidth || nativeMetaInfo.Size.Height > hardwareDisplayHeight)
+                //if (nativeMetaInfo.Size.Width > hardwareDisplayWidth || nativeMetaInfo.Size.Height > hardwareDisplayHeight)
+                if (sourcePixelSize.Width > hardwareDisplayWidth || sourcePixelSize.Height > hardwareDisplayHeight)
                 {
                     // LARGE IMAGE DETECTED -> Downscale to match display width smoothly
                     // We reset the stream index position to read it cleanly from the beginning
@@ -45,8 +47,10 @@ public static class UniversalBitmapLoader
 
                     //finalBitmap = Bitmap.DecodeToWidth(stream, hardwareDisplayWidth);
 
-                    double widthRatio = (double)hardwareDisplayWidth / nativeMetaInfo.Size.Width;
-                    double heightRatio = (double)hardwareDisplayHeight / nativeMetaInfo.Size.Height;
+                    //double widthRatio = (double)hardwareDisplayWidth / nativeMetaInfo.Size.Width;
+                    //double heightRatio = (double)hardwareDisplayHeight / nativeMetaInfo.Size.Height;
+                    double widthRatio = (double)hardwareDisplayWidth / sourcePixelSize.Width;
+                    double heightRatio = (double)hardwareDisplayHeight / sourcePixelSize.Height;
 
                     // Use the smaller ratio to ensure the image fits entirely within the display boundary
                     if (widthRatio < heightRatio)
