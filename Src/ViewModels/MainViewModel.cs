@@ -19,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -89,6 +90,9 @@ internal sealed partial class MainViewModel : ObservableObject, IDisposable
         IsEffectPageSlideOn = config.IsEffectPageSlideOn;
         IsNoEffectsOn = config.IsNoEffectsOn;
         IsEffectCrossfadeOn = config.IsEffectCrossfadeOn;
+
+        // For metadata reading, e.g. exif orientation.
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
         // Init Timer.
         _timerSlideshow = new DispatcherTimer

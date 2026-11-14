@@ -2,9 +2,32 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 
 namespace ImageViewer.Helpers;
+
+internal sealed partial class ExplorerLogicalSortComparer : IComparer<string>
+{
+    private static readonly NaturalSortComparer _fallbackComparer = new();
+
+    public int Compare(string? x, string? y)
+    {
+        if (x is null && y is null) return 0;
+        if (x is null) return -1;
+        if (y is null) return 1;
+
+        return OperatingSystem.IsWindows()
+            ? NativeMethods.StrCmpLogicalW(x, y)
+            : _fallbackComparer.Compare(x, y);
+    }
+
+    private static partial class NativeMethods
+    {
+        [LibraryImport("shlwapi.dll", EntryPoint = "StrCmpLogicalW", StringMarshalling = StringMarshalling.Utf16)]
+        internal static partial int StrCmpLogicalW(string x, string y);
+    }
+}
 
 internal sealed class LinuxFilesComparer : IComparer<FileSystemInfo>
 {
@@ -31,7 +54,7 @@ internal sealed partial class NaturalSortComparer : IComparer<string>, IComparer
     private static readonly Regex _regex = CompRegex();
 
     /// <summary>
-    /// Compares two strings using natural sorting rules.
+    /// Compares two strings using natural sorting rules and case-sensitive current-culture text comparison.
     /// </summary>
     /// <param name="x">The first string to compare.</param>
     /// <param name="y">The second string to compare.</param>
@@ -65,7 +88,7 @@ internal sealed partial class NaturalSortComparer : IComparer<string>, IComparer
             // If at least one part is not a number, compare as strings
             else
             {
-                int stringComparison = string.Compare(xParts[i], yParts[i], StringComparison.OrdinalIgnoreCase);
+                int stringComparison = string.Compare(xParts[i], yParts[i], StringComparison.CurrentCulture);
                 if (stringComparison != 0)
                 {
                     return stringComparison;

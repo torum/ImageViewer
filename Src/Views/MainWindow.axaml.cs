@@ -1040,17 +1040,14 @@ internal sealed partial class MainWindow : Window
         }
     }
 
-    private void RecursivelyProcessFiles(List<string> fileNames, List<FileSystemInfo> allItems)
+    private void RecursivelyProcessFiles(List<string> fileNames, List<FileSystemInfo> allItems, IComparer<string> comparer, bool sortByName = false)
     {
         if (_cts == null || _cts.IsCancellationRequested)
         {
             return;
         }
 
-        // On Linux.
-        //Sort
-        IComparer<string> naturalSortComparer = new ImageViewer.Helpers.NaturalSortComparer();
-        fileNames = [.. fileNames.OrderBy(x => x, naturalSortComparer)];//StringComparer.Ordinal
+        fileNames = [.. fileNames.OrderBy(x => sortByName ? System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(x)) : x, comparer)];
 
         // File first
         List<FileSystemInfo> files = [];
@@ -1092,7 +1089,7 @@ internal sealed partial class MainWindow : Window
                 {
                     return;
                 }
-                RecursivelyProcessFiles(folderFileNames, allItems);
+                RecursivelyProcessFiles(folderFileNames, allItems, comparer, sortByName);
             }
         }
     }
@@ -1146,8 +1143,83 @@ internal sealed partial class MainWindow : Window
                 var droppedImages = new List<ImageInfo>();
                 var singleSelectedOriginalFile = string.Empty;
 
-                // Linux for sort
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)) //RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || 
+                // On Windows it will use the Shell’s logical filename comparison
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                {
+                    //Debug.WriteLine("Windows sort mode @ProcessFiles()");
+
+                    IComparer<string> logicalSortComparer = new ImageViewer.Helpers.ExplorerLogicalSortComparer();
+                    List<FileSystemInfo> allItems = [];
+                    RecursivelyProcessFiles(fileNames, allItems, logicalSortComparer, sortByName: true);
+                    var droppedFiles = allItems.Select(item => item.FullName).ToList();
+
+                    if (_cts == null || _cts.IsCancellationRequested)
+                    {
+                        return;
+                    }
+
+                    // Single file dropped, in that case, get all siblings.
+                    if (droppedFiles.Count == 1)
+                    {
+                        if (System.IO.File.Exists(droppedFiles[0]) && MainViewModel.HasImageExtension(droppedFiles[0], MainViewModel.ValidExtensions))
+                        {
+                            //var originalFile = droppedFiles[0];
+                            singleSelectedOriginalFile = droppedFiles[0];
+
+                            // Get parent dir.
+                            string? parentFolderPath = System.IO.Path.GetDirectoryName(droppedFiles[0]);
+                            if (parentFolderPath is not null)
+                            {
+                                if (Directory.Exists(parentFolderPath))
+                                {
+                                    // NON-Recursively get all files from the folder
+                                    var filesInFolder = Directory.GetFiles(parentFolderPath, "*", SearchOption.TopDirectoryOnly);
+
+                                    droppedFiles.AddRange(filesInFolder.OrderBy(f => System.IO.Path.GetFileName(f), logicalSortComparer));
+
+                                    if (droppedFiles.Count > 1)
+                                    {
+                                        // Sort to move the first instance of 'originalFile' to the front, followed by other files.
+                                        // Using `Distinct()` will remove the remaining duplicates.
+                                        //droppedFiles = droppedFiles.OrderBy(x => x == singleSelectedOriginalFile ? 0 : 1).Distinct().ToList();
+
+                                        // removes now duplicated image file path.
+                                        droppedFiles.RemoveAt(0);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    foreach (var fileFullPath in droppedFiles)
+                    {
+                        if (_cts == null || _cts.IsCancellationRequested)
+                        {
+                            return;
+                        }
+
+                        if (!MainViewModel.HasImageExtension(fileFullPath, MainViewModel.ValidExtensions))
+                        {
+                            continue;
+                        }
+
+                        // Avoid MacOS's garbage. Use char overload for faster comp if possible.
+                        string fileName = System.IO.Path.GetFileName(fileFullPath);
+
+                        if (fileName.StartsWith('.') || fileName.StartsWith("._"))
+                        {
+                            continue;
+                        }
+
+                        var img = new ImageInfo
+                        {
+                            ImageFilePath = fileFullPath
+                        };
+
+                        droppedImages.Add(img);
+                    }
+                }
+                else // if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     //Debug.WriteLine("Linux sort mode @ProcessFiles()");
 
@@ -1207,7 +1279,7 @@ internal sealed partial class MainWindow : Window
 
                     List<FileSystemInfo> allItems = [];
 
-                    RecursivelyProcessFiles(IncludeSiblingsFileNames, allItems);
+                    RecursivelyProcessFiles(IncludeSiblingsFileNames, allItems, new ImageViewer.Helpers.NaturalSortComparer());
 
                     foreach (var item in allItems)
                     {
@@ -1254,108 +1326,6 @@ internal sealed partial class MainWindow : Window
                     // Using `Distinct()` will remove the remaining duplicates.
                     //droppedImages = droppedImages.OrderBy(x => x.ImageFilePath == singleSelectedOriginalFile ? 0 : 1).Distinct().ToList();
                     //}
-                }
-                else // if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    //Debug.WriteLine("None-Linux sort mode @ProcessFiles()");
-
-                    var droppedFiles = new List<string>();
-
-                    // Get all files recursively.
-                    foreach (var item in fileNames)
-                    {
-                        if (_cts == null || _cts.IsCancellationRequested)
-                        {
-                            return;
-                        }
-
-                        if (System.IO.File.Exists(item))//.Path.LocalPath
-                        {
-                            // Add single files
-                            droppedFiles.Add(item);//.Path.LocalPath
-                        }
-                        else if (Directory.Exists(item))//.Path.LocalPath
-                        {
-                            // Recursively get all files from a dropped folder
-                            var filesInFolder = Directory.GetFiles(item, "*", SearchOption.AllDirectories);//.Path.LocalPath
-
-                            // Sort
-                            //filesInFolder = [.. filesInFolder.OrderBy(f => f)];
-                            //filesInFolder = [.. filesInFolder.OrderBy(f => f, StringComparison.CurrentCultureIgnoreCase.WithNaturalSort())];
-
-                            droppedFiles.AddRange(filesInFolder);
-                        }
-                    }
-
-                    if (_cts == null || _cts.IsCancellationRequested)
-                    {
-                        return;
-                    }
-
-                    // Single file dropped, in that case, get all siblings.
-                    if (droppedFiles.Count == 1)
-                    {
-                        if (System.IO.File.Exists(droppedFiles[0]) && MainViewModel.HasImageExtension(droppedFiles[0], MainViewModel.ValidExtensions))
-                        {
-                            //var originalFile = droppedFiles[0];
-                            singleSelectedOriginalFile = droppedFiles[0];
-
-                            // Get parent dir.
-                            string? parentFolderPath = System.IO.Path.GetDirectoryName(droppedFiles[0]);
-                            if (parentFolderPath is not null)
-                            {
-                                if (Directory.Exists(parentFolderPath))
-                                {
-                                    // NON-Recursively get all files from the folder
-                                    var filesInFolder = Directory.GetFiles(parentFolderPath, "*", SearchOption.TopDirectoryOnly);
-
-                                    // Sort
-                                    //filesInFolder = [.. filesInFolder.OrderBy(f => f)];
-                                    //filesInFolder = [.. filesInFolder.OrderBy(f => f, StringComparison.CurrentCultureIgnoreCase.WithNaturalSort())];
-
-                                    droppedFiles.AddRange(filesInFolder);
-
-                                    if (droppedFiles.Count > 1)
-                                    {
-                                        // Sort to move the first instance of 'originalFile' to the front, followed by other files.
-                                        // Using `Distinct()` will remove the remaining duplicates.
-                                        //droppedFiles = droppedFiles.OrderBy(x => x == singleSelectedOriginalFile ? 0 : 1).Distinct().ToList();
-
-                                        // removes now duplicated image file path.
-                                        droppedFiles.RemoveAt(0);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    foreach (var fileFullPath in droppedFiles)
-                    {
-                        if (_cts == null || _cts.IsCancellationRequested)
-                        {
-                            return;
-                        }
-
-                        if (!MainViewModel.HasImageExtension(fileFullPath, MainViewModel.ValidExtensions))
-                        {
-                            continue;
-                        }
-
-                        // Avoid MacOS's garbage. Use char overload for faster comp if possible.
-                        string fileName = System.IO.Path.GetFileName(fileFullPath);
-
-                        if (fileName.StartsWith('.') || fileName.StartsWith("._"))
-                        {
-                            continue;
-                        }
-
-                        var img = new ImageInfo
-                        {
-                            ImageFilePath = fileFullPath
-                        };
-
-                        droppedImages.Add(img);
-                    }
                 }
 
                 if (_cts == null || _cts.IsCancellationRequested)
@@ -1984,11 +1954,14 @@ internal sealed partial class MainWindow : Window
             return;
         }
 
-        if ((selectedIndex > (vm.Queue.Count - 1)) && (selectedIndex < 0))
+        var queue = vm.Queue;
+        if (selectedIndex < 0 || selectedIndex >= queue.Count)
         {
-            Debug.WriteLine("if ((selectedIndex > c) && (selectedIndex < 0))");
+            Debug.WriteLine($"Queue index {selectedIndex} is outside the current queue.");
             return;
         }
+
+        var selectedItem = queue[selectedIndex];
 
         await Task.Yield();
         //await Task.Delay(300); // Need to wait for UI to update
@@ -1999,21 +1972,11 @@ internal sealed partial class MainWindow : Window
                 return;
             }
 
-            if (lb.ItemCount == 0)
+            if (!ReferenceEquals(DataContext, vm) || !ReferenceEquals(vm.Queue, queue) ||
+                !ReferenceEquals(lb.ItemsSource, queue) || selectedIndex >= queue.Count ||
+                selectedIndex >= lb.ItemCount || !ReferenceEquals(queue[selectedIndex], selectedItem))
             {
-                return;
-            }
-
-            if (lb.ItemCount < (selectedIndex + 1))
-            {
-                Debug.WriteLine($"if ({lb.ItemCount} < ({selectedIndex + 1}))");
-                return;
-            }
-
-            //lb.ScrollIntoView(selectedIndex);
-
-            if (DataContext is not MainViewModel)
-            {
+                Debug.WriteLine($"Ignoring stale queue update for index {selectedIndex}.");
                 return;
             }
 
@@ -2028,16 +1991,8 @@ internal sealed partial class MainWindow : Window
                 return;
             }
 
-            var test = vm?.Queue[selectedIndex];
-            if (test != null)
-            {
-                lb.SelectedItem = test;
-
-                // 
-                lb.ScrollIntoView(selectedIndex);
-            }
-
-            //
+            lb.SelectedItem = selectedItem;
+            lb.ScrollIntoView(selectedIndex);
 
             // Center selected.
             if (lb.SelectedItem is not null)
