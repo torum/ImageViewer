@@ -9,7 +9,6 @@ using Avalonia.Styling;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using ImageViewer.Models;
-using ImageViewer.Services;
 using ImageViewer.Services.Contracts;
 using ImageViewer.ViewModels;
 using System;
@@ -21,8 +20,6 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml;
-using System.Xml.Linq;
 
 namespace ImageViewer.Views;
 
@@ -1098,7 +1095,7 @@ internal sealed partial class MainWindow : Window
     {
         //Debug.WriteLine("ProcessFiles()");
 
-        _mainViewModel.IsWorking = true;
+        //_mainViewModel.IsWorking = true;
 
         // Don't await. FIRE and FORGET! Otherwise GUI would freeze or be 100x slower (try sleeping HDD).
         _ = Task.Run(async () =>
