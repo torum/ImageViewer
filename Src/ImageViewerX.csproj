@@ -11,8 +11,8 @@
 		<ApplicationIcon>Assets\ImageViewerX-AppIcon.ico</ApplicationIcon>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<Features>runtime-async=on</Features>
-		<VersionPrefix>1.0.5.0</VersionPrefix>
-		<FileVersion>1.0.5.0</FileVersion>
+		<VersionPrefix>1.0.6.0</VersionPrefix>
+		<FileVersion>1.0.6.0</FileVersion>
 		<IsAotCompatible>true</IsAotCompatible>
 	</PropertyGroup>
 
@@ -59,7 +59,7 @@
 		<PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.157.0" />
 		<PackageReference Include="SkiaSharp.NativeAssets.macOS" Version="4.157.0" />
 		<PackageReference Include="SkiaSharp.NativeAssets.Win32" Version="4.157.0" />
-		<PackageReference Include="Xaml.Behaviors.Interactions" Version="12.1.5" />
+		<PackageReference Include="Xaml.Behaviors.Interactions" Version="12.2.0" />
 		<!--
 	  <PackageReference Include="MetadataExtractor" Version="2.9.2" />
 	  -->

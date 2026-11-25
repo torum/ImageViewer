@@ -1,6 +1,6 @@
 # Build and publish
 
-ImageViewerX/Src$ dotnet publish ImageViewerX.csproj -c Release -r linux-x64 -f net10.0 -p:PublishAot=true --self-contained true
+ImageViewerX/Src$ dotnet publish ImageViewerX.csproj -c Release -r linux-x64 -f net11.0 -p:PublishAot=true --self-contained true
 
 # Grab published binaries
 
@@ -28,6 +28,6 @@ ImageViewerX/Src$ sudo apt install ./ImageViewerX_1.0.0_amd64.deb
 =======================
 For Windows:
 
-ImageViewerX/Src$ dotnet publish ImageViewerX.csproj -c Release -r win-x64 -f net10.0 -p:PublishAot=true --self-contained true
+ImageViewerX/Src$ dotnet publish ImageViewerX.csproj -c Release -r win-x64 -f net11.0 -p:PublishAot=true --self-contained true
 
 
